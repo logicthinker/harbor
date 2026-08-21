@@ -1,0 +1,56 @@
+name: Release Harbor
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:type
+      - run: pnpm test
+      - run: pnpm exec playwright install chromium
+      - run: pnpm test:browser
+      - run: pnpm desktop:build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Import Windows signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE_BASE64) { throw 'WINDOWS_CERTIFICATE_BASE64 is required for signed releases.' }
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\harbor.pfx", [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+      - name: Sign installers
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $files = Get-ChildItem 'src-tauri/target/release/bundle' -Recurse -Include *.msi,*.exe
+          foreach ($file in $files) { & signtool sign /f "$env:RUNNER_TEMP\harbor.pfx" /p $env:WINDOWS_CERTIFICATE_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $file.FullName; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+      - name: Verify installer signatures
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem 'src-tauri/target/release/bundle' -Recurse -Include *.msi,*.exe
+          foreach ($file in $files) { & signtool verify /pa /all $file.FullName; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+            CHANGELOG.md
+          generate_release_notes: true
