@@ -33,7 +33,18 @@ export const harbor = {
   async loadProject(): Promise<Project> {
     const native = await invoke<Project>('load_project')
     if (native?.requests) {
-      for (const environment of native.environments) for (const variable of environment.variables) if (variable.secret) { const value = await invoke<string | null>('get_secret', { scope: secretScope(native.name, environment.name, variable.key) }); if (value) variable.value = value }
+      const promises: Promise<void>[] = []
+      for (const environment of native.environments) {
+        for (const variable of environment.variables) {
+          if (variable.secret) {
+            promises.push((async () => {
+              const value = await invoke<string | null>('get_secret', { scope: secretScope(native.name, environment.name, variable.key) })
+              if (value) variable.value = value
+            })())
+          }
+        }
+      }
+      await Promise.all(promises)
       return migrateProject(native)
     }
     const saved = localStorage.getItem('harbor.project')
@@ -41,7 +52,21 @@ export const harbor = {
   },
   async saveProject(project: Project): Promise<void> {
     const diskProject = JSON.parse(JSON.stringify(project)) as Project
-    for (const environment of project.environments) for (const variable of environment.variables) if (variable.secret) { sessionSecrets.set(secretScope(project.name, environment.name, variable.key), variable.value); await invoke('set_secret', { scope: secretScope(project.name, environment.name, variable.key), value: variable.value }); const diskEnvironment = diskProject.environments.find((item) => item.name === environment.name); const diskVariable = diskEnvironment?.variables.find((item) => item.key === variable.key); if (diskVariable) diskVariable.value = '' }
+    const promises: Promise<void>[] = []
+    for (const environment of project.environments) {
+      for (const variable of environment.variables) {
+        if (variable.secret) {
+          sessionSecrets.set(secretScope(project.name, environment.name, variable.key), variable.value)
+          promises.push((async () => {
+            await invoke('set_secret', { scope: secretScope(project.name, environment.name, variable.key), value: variable.value })
+          })())
+          const diskEnvironment = diskProject.environments.find((item) => item.name === environment.name)
+          const diskVariable = diskEnvironment?.variables.find((item) => item.key === variable.key)
+          if (diskVariable) diskVariable.value = ''
+        }
+      }
+    }
+    await Promise.all(promises)
     localStorage.setItem('harbor.project', JSON.stringify(diskProject))
     await invoke('save_project', { project: diskProject })
   },
