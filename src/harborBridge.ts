@@ -41,7 +41,19 @@ export const harbor = {
   },
   async saveProject(project: Project): Promise<void> {
     const diskProject = JSON.parse(JSON.stringify(project)) as Project
-    for (const environment of project.environments) for (const variable of environment.variables) if (variable.secret) { sessionSecrets.set(secretScope(project.name, environment.name, variable.key), variable.value); await invoke('set_secret', { scope: secretScope(project.name, environment.name, variable.key), value: variable.value }); const diskEnvironment = diskProject.environments.find((item) => item.name === environment.name); const diskVariable = diskEnvironment?.variables.find((item) => item.key === variable.key); if (diskVariable) diskVariable.value = '' }
+    const secretPromises: Promise<void | undefined>[] = []
+    for (const environment of project.environments) {
+      for (const variable of environment.variables) {
+        if (variable.secret) {
+          sessionSecrets.set(secretScope(project.name, environment.name, variable.key), variable.value)
+          secretPromises.push(invoke('set_secret', { scope: secretScope(project.name, environment.name, variable.key), value: variable.value }))
+          const diskEnvironment = diskProject.environments.find((item) => item.name === environment.name)
+          const diskVariable = diskEnvironment?.variables.find((item) => item.key === variable.key)
+          if (diskVariable) diskVariable.value = ''
+        }
+      }
+    }
+    await Promise.all(secretPromises)
     localStorage.setItem('harbor.project', JSON.stringify(diskProject))
     await invoke('save_project', { project: diskProject })
   },
