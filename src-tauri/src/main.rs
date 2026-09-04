@@ -83,7 +83,7 @@ async fn execute_request(input: HttpRequestInput, state: State<'_, AppState>) ->
 async fn load_project(app: AppHandle, state: State<'_, AppState>) -> Result<HarborProject, String> {
     let path = project_path(&app)?;
     if path.exists() {
-        let bytes = std::fs::read(path).map_err(|e| format!("Could not read project: {e}"))?;
+        let bytes = tokio::fs::read(path).await.map_err(|e| format!("Could not read project: {e}"))?;
         let project: HarborProject = serde_json::from_slice(&bytes).map_err(|e| format!("Could not parse project: {e}"))?;
         *state.project.lock().await = project.clone();
         return Ok(project);
@@ -97,8 +97,8 @@ async fn save_project(app: AppHandle, project: HarborProject, state: State<'_, A
     let mut disk_project = project.clone();
     for environment in &mut disk_project.environments { for variable in &mut environment.variables { if variable.secret { variable.value.clear(); } } }
     let serialized = serde_json::to_vec_pretty(&disk_project).map_err(|e| format!("Could not serialize project: {e}"))?;
-    std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| format!("Could not create project directory: {e}"))?;
-    std::fs::write(path, serialized).map_err(|e| format!("Could not save project: {e}"))?;
+    tokio::fs::create_dir_all(path.parent().unwrap()).await.map_err(|e| format!("Could not create project directory: {e}"))?;
+    tokio::fs::write(path, serialized).await.map_err(|e| format!("Could not save project: {e}"))?;
     *state.project.lock().await = project;
     Ok(())
 }
