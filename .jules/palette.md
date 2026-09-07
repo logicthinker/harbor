@@ -1,0 +1,3 @@
+## 2025-03-08 - [Refactored imperative accessibility out of main.tsx]
+**Learning:** Found a component using a `useEffect` hook to imperatively manipulate the DOM to add `aria-label` attributes to various input, select, and button elements, missing out on semantic usage.
+**Action:** Always prefer setting attributes like `aria-label` declaratively within JSX on React components, avoiding direct DOM manipulation like `document.querySelectorAll` in `useEffect` when not strictly necessary for third-party libraries without such support. Added attributes directly to `<select>`, `<input>`, and icon-only `<button>` tags.
