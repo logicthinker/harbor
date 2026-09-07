@@ -1,0 +1,3 @@
+## 2024-05-19 - The UI stuttering in monolith mode
+**Learning:** The React application in `src/main.tsx` functions as a large monolith. Since the state is centrally managed without context splitting or deep component extraction, even minor unrelated state changes (like typing a query string) will unnecessarily rerun the expensive string-mapping code for large request bodies or the array filtering code for visible collections.
+**Action:** Always wrap expensive DOM manipulation (e.g. `body.split().map`) and potentially large O(N) filtering algorithms in `useMemo` specifically in monolithic architectural structures where component isolation is lacking.
