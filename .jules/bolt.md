@@ -1,0 +1,3 @@
+## 2024-03-22 - Prevent UI stuttering in large monolith React applications
+**Learning:** In a large monolith React application where state changes frequently (like typing in an input field), unmemoized expensive operations (such as array filtering with string matching or splitting large text bodies) executed during every render cycle can block the main thread and cause noticeable UI stuttering.
+**Action:** When working on large React components with frequent re-renders, proactively identify and wrap expensive computations (like `.filter()`, `.map()`, or `.split()` on large datasets) with `useMemo`, ensuring proper dependency arrays are set, to significantly improve performance.
