@@ -1,0 +1,4 @@
+## 2024-05-18 - SSRF scheme bypass prevention
+**Vulnerability:** The native Tauri `execute_request` command accepted any valid URL scheme, which allowed internal protocols like `file://` to be passed to `reqwest`, leading to local file inclusion (LFI) via Server-Side Request Forgery (SSRF).
+**Learning:** `reqwest` blocks `file://` out of the box in some versions/configurations, but explicitly enforcing `http` and `https` at the application boundary is a necessary defense-in-depth measure, especially when native code accepts user input. Because this tool is explicitly for local API testing, `localhost` and local IP address checks should not be blocked, which diverges from standard SSRF protections.
+**Prevention:** Always parse and validate URL schemes from user input before passing them to native network clients. Ensure validation aligns with the specific functional requirements of the application (e.g., allowing local IPs for local dev tools).
