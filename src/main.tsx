@@ -28,7 +28,14 @@ function App() {
   const importRef = useRef<HTMLInputElement>(null)
   const active = useMemo(() => project.requests.find((item) => item.id === activeId) ?? project.requests[0], [project.requests, activeId])
   const env = project.environments.find((item) => item.name === environment) ?? project.environments[0]
-  const visibleRequests = project.requests.filter((item) => `${item.name} ${item.path}`.toLowerCase().includes(search.toLowerCase()))
+  // ⚡ Bolt: Memoize expensive string concatenation and list filtering
+  // Expected Impact: Eliminates O(N) string processing operations on every unrelated component render,
+  // preventing UI stutter during high-frequency updates (e.g. typing in parameter fields).
+  const visibleRequests = useMemo(() => {
+    // Hoist .toLowerCase() out of the filter loop
+    const searchLower = search.toLowerCase()
+    return project.requests.filter((item) => `${item.name} ${item.path}`.toLowerCase().includes(searchLower))
+  }, [project.requests, search])
 
   useEffect(() => { void harbor.loadProject().then((loaded) => { setProject(loaded); setActiveId(loaded.requests[0]?.id ?? ''); setEnvironment(loaded.environments[0]?.name ?? 'development'); setHydrated(true) }) }, [])
   useEffect(() => { if (hydrated && project.requests.length) void harbor.saveProject(project) }, [hydrated, project])
