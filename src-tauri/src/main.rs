@@ -60,11 +60,21 @@ fn get_secret(scope: String) -> Result<Option<String>, String> {
 #[tauri::command]
 fn delete_secret(scope: String) -> Result<(), String> { secret_entry(&scope)?.delete_credential().map_err(|e| format!("Could not delete secret: {e}")) }
 
+fn validate_url(url_str: &str) -> Result<reqwest::Url, String> {
+    let parsed_url = reqwest::Url::parse(url_str).map_err(|e| format!("Invalid URL: {e}"))?;
+    let scheme = parsed_url.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err(format!("Invalid URL scheme: {}. Only http and https are allowed.", scheme));
+    }
+    Ok(parsed_url)
+}
+
 #[tauri::command]
 async fn execute_request(input: HttpRequestInput, state: State<'_, AppState>) -> Result<HttpResponseOutput, String> {
     let method = Method::from_bytes(input.method.as_bytes()).map_err(|e| format!("Invalid HTTP method: {e}"))?;
+    let parsed_url = validate_url(&input.url)?;
     let started = std::time::Instant::now();
-    let mut request = state.client.request(method, &input.url);
+    let mut request = state.client.request(method, parsed_url);
     if let Some(headers) = input.headers {
         for header in headers {
             request = request.header(&header.key, &header.value);
@@ -137,5 +147,14 @@ mod tests {
         assert!(Method::from_bytes(b"GET").is_ok());
         assert!(Method::from_bytes(b"PATCH").is_ok());
         assert!(Method::from_bytes(b"not valid").is_err());
+    }
+
+    #[test]
+    fn url_validation_rejects_unsafe_schemes() {
+        assert!(validate_url("http://localhost:5173").is_ok());
+        assert!(validate_url("https://example.com").is_ok());
+        assert!(validate_url("file:///etc/passwd").is_err());
+        assert!(validate_url("ftp://example.com").is_err());
+        assert!(validate_url("javascript:alert(1)").is_err());
     }
 }
