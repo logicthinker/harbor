@@ -27,8 +27,16 @@ function App() {
   const [splitView, setSplitView] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
   const active = useMemo(() => project.requests.find((item) => item.id === activeId) ?? project.requests[0], [project.requests, activeId])
-  const env = project.environments.find((item) => item.name === environment) ?? project.environments[0]
-  const visibleRequests = project.requests.filter((item) => `${item.name} ${item.path}`.toLowerCase().includes(search.toLowerCase()))
+  // ⚡ Bolt: Memoize environment lookup to prevent O(n) array search on unrelated state changes (e.g. typing in search)
+  // Expected impact: Eliminates redundant array scans during typing, stabilizing render performance for large projects
+  const env = useMemo(() => project.environments.find((item) => item.name === environment) ?? project.environments[0], [project.environments, environment])
+
+  // ⚡ Bolt: Memoize request filtering and hoist invariant search.toLowerCase() out of the .filter() loop
+  // Expected impact: Drastically reduces string allocations and operations (O(n) -> O(1) for search Lowercasing) during typing or unrelated state updates
+  const visibleRequests = useMemo(() => {
+    const searchLower = search.toLowerCase()
+    return project.requests.filter((item) => `${item.name} ${item.path}`.toLowerCase().includes(searchLower))
+  }, [project.requests, search])
 
   useEffect(() => { void harbor.loadProject().then((loaded) => { setProject(loaded); setActiveId(loaded.requests[0]?.id ?? ''); setEnvironment(loaded.environments[0]?.name ?? 'development'); setHydrated(true) }) }, [])
   useEffect(() => { if (hydrated && project.requests.length) void harbor.saveProject(project) }, [hydrated, project])
@@ -63,7 +71,12 @@ function App() {
   const importProject = (file: File) => { const reader = new FileReader(); reader.onload = () => { try { const text = String(reader.result); const parsed = file.name.endsWith('.yaml') || file.name.endsWith('.yml') ? parseYaml(text) : JSON.parse(text); const next = importCompatibleProject(parsed); setProject(next); setActiveId(next.requests[0]?.id ?? ''); setToast('Collection or OpenAPI document imported') } catch { setToast('Import failed — choose Harbor, Postman, or OpenAPI JSON/YAML') } }; reader.readAsText(file) }
   const statusText = response ? `${response.status} ${response.status_text}` : '200 OK'
   const body = response?.body ?? demoResponse
-  const testResults = response ? active.tests.filter((test) => test.enabled).map((test) => ({ ...test, passed: test.expression === 'status' ? String(response.status) === test.expected : true })) : []
+
+  // ⚡ Bolt: Memoize test result calculation to avoid array mapping and filtering on unrelated state changes
+  // Expected impact: Prevents redundant array operations when response or tests haven't changed, improving UI responsiveness
+  const testResults = useMemo(() => {
+    return response ? active.tests.filter((test) => test.enabled).map((test) => ({ ...test, passed: test.expression === 'status' ? String(response.status) === test.expected : true })) : []
+  }, [response, active.tests])
 
   return <div className={`app-shell ${lightTheme ? 'light-theme' : ''} ${splitView ? 'split-view' : ''}`}>
     <header className="topbar"><div className="brand"><div className="brand-mark"><span /></div><span>harbor</span><span className="beta">LOCAL</span></div><div className="crumb"><span className="muted">workspace</span><ChevronRight size={14}/><strong>{project.name}</strong><ChevronDown size={14}/></div><div className="top-actions"><label className="env-select"><span className="env-dot"/><select value={environment} onChange={(event) => setEnvironment(event.target.value)}>{project.environments.map((item) => <option key={item.name}>{item.name}</option>)}</select><ChevronDown size={13}/></label><button className="icon-button" title="Toggle theme" onClick={() => setLightTheme((current) => !current)}><Moon size={16}/></button><button className="icon-button" title="Settings" onClick={() => setSettingsOpen((current) => !current)}><Settings2 size={16}/></button><div className="avatar">VK</div></div></header>
