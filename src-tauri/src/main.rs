@@ -62,9 +62,16 @@ fn delete_secret(scope: String) -> Result<(), String> { secret_entry(&scope)?.de
 
 #[tauri::command]
 async fn execute_request(input: HttpRequestInput, state: State<'_, AppState>) -> Result<HttpResponseOutput, String> {
+    // Security: Validate URL scheme to prevent SSRF and local file disclosure (e.g., file://)
+    let parsed_url = reqwest::Url::parse(&input.url).map_err(|e| format!("Invalid URL: {e}"))?;
+    let scheme = parsed_url.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err("Only HTTP and HTTPS schemes are allowed".into());
+    }
+
     let method = Method::from_bytes(input.method.as_bytes()).map_err(|e| format!("Invalid HTTP method: {e}"))?;
     let started = std::time::Instant::now();
-    let mut request = state.client.request(method, &input.url);
+    let mut request = state.client.request(method, parsed_url);
     if let Some(headers) = input.headers {
         for header in headers {
             request = request.header(&header.key, &header.value);
@@ -137,5 +144,29 @@ mod tests {
         assert!(Method::from_bytes(b"GET").is_ok());
         assert!(Method::from_bytes(b"PATCH").is_ok());
         assert!(Method::from_bytes(b"not valid").is_err());
+    }
+
+    #[tokio::test]
+    async fn url_parsing_rejects_file_scheme() {
+        // Since we can't easily construct a Tauri `State` in tests without spinning up the event loop,
+        // we'll mock the URL parsing logic here to verify the security fix.
+        let url = "file:///etc/passwd";
+        let parsed_url = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL: {e}"));
+        assert!(parsed_url.is_ok());
+
+        let scheme = parsed_url.unwrap().scheme().to_string();
+        let is_allowed = scheme == "http" || scheme == "https";
+        assert!(!is_allowed);
+    }
+
+    #[tokio::test]
+    async fn url_parsing_allows_http_scheme() {
+        let url = "http://localhost:5173/api";
+        let parsed_url = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL: {e}"));
+        assert!(parsed_url.is_ok());
+
+        let scheme = parsed_url.unwrap().scheme().to_string();
+        let is_allowed = scheme == "http" || scheme == "https";
+        assert!(is_allowed);
     }
 }
