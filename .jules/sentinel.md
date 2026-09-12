@@ -1,0 +1,4 @@
+## 2024-09-12 - Prevent SSRF via Scheme Validation, Not Local IP Blocking
+**Vulnerability:** The application was vulnerable to SSRF (Server-Side Request Forgery) and LFI (Local File Inclusion) by passing arbitrary schemes like `file://` to `reqwest` in the Rust backend.
+**Learning:** The Harbor application is a local-first API development studio that *inherently requires* making requests to localhost and private IPs for its core functionality. Standard SSRF mitigation techniques that block local or private IP ranges cannot be used here because they break the app.
+**Prevention:** Instead of blocking local IPs, strictly validate and restrict the URL scheme to `http` and `https` only. This prevents accessing local files via `file://` or other unsafe schemes while preserving the required functionality of testing local APIs.
