@@ -27,8 +27,13 @@ function App() {
   const [splitView, setSplitView] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
   const active = useMemo(() => project.requests.find((item) => item.id === activeId) ?? project.requests[0], [project.requests, activeId])
-  const env = project.environments.find((item) => item.name === environment) ?? project.environments[0]
-  const visibleRequests = project.requests.filter((item) => `${item.name} ${item.path}`.toLowerCase().includes(search.toLowerCase()))
+  /* ⚡ Bolt: Memoize environment lookup to prevent O(N) array search on every render */
+  const env = useMemo(() => project.environments.find((item) => item.name === environment) ?? project.environments[0], [project.environments, environment])
+  /* ⚡ Bolt: Memoize visible requests to prevent expensive O(N) string processing and array filtering on every render. Hoisted search.toLowerCase() to avoid invariant calculation in loop. */
+  const visibleRequests = useMemo(() => {
+    const query = search.toLowerCase();
+    return project.requests.filter((item) => `${item.name} ${item.path}`.toLowerCase().includes(query));
+  }, [project.requests, search])
 
   useEffect(() => { void harbor.loadProject().then((loaded) => { setProject(loaded); setActiveId(loaded.requests[0]?.id ?? ''); setEnvironment(loaded.environments[0]?.name ?? 'development'); setHydrated(true) }) }, [])
   useEffect(() => { if (hydrated && project.requests.length) void harbor.saveProject(project) }, [hydrated, project])
