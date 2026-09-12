@@ -1,0 +1,3 @@
+## 2024-09-12 - React Monolith Render Performance
+**Learning:** In highly centralized, monolithic React components (like Harbor's `App` in `src/main.tsx`), failing to memoize array iterations and string manipulations (such as filtering visible items) causes profound UI lag because these costly operations execute on *every* keystroke and state update.
+**Action:** Always wrap expensive, repetitive derived state calculations (e.g., `filter`, `find`) in `useMemo`. When deriving arrays based on string matching, hoist the invariant transformations (like `search.toLowerCase()`) out of the loop block to drastically minimize unnecessary processing overhead per render cycle.
