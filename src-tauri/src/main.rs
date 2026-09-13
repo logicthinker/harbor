@@ -62,6 +62,13 @@ fn delete_secret(scope: String) -> Result<(), String> { secret_entry(&scope)?.de
 
 #[tauri::command]
 async fn execute_request(input: HttpRequestInput, state: State<'_, AppState>) -> Result<HttpResponseOutput, String> {
+    // SECURITY: Prevent Server-Side Request Forgery (SSRF) to local files or unsafe protocols
+    let parsed_url = reqwest::Url::parse(&input.url).map_err(|e| format!("Invalid URL: {e}"))?;
+    let scheme = parsed_url.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err("Security Error: Only HTTP and HTTPS schemes are allowed".into());
+    }
+
     let method = Method::from_bytes(input.method.as_bytes()).map_err(|e| format!("Invalid HTTP method: {e}"))?;
     let started = std::time::Instant::now();
     let mut request = state.client.request(method, &input.url);
