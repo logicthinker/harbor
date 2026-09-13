@@ -1,0 +1,3 @@
+## 2024-06-25 - [Frontend Monolith Array Operations]
+**Learning:** In large monolithic React applications like `src/main.tsx`, iterating over arrays (like filtering requests based on search input) runs synchronously during every single render cycle. Operations within the loop (like `.toLowerCase()`) are evaluated `N` times per render.
+**Action:** When working in this codebase, actively look for and memoize expensive array operations using `useMemo`, and always hoist invariant calculations (like transforming a search string) outside the `.filter()` loop to reduce processing time and memory allocation per render.
