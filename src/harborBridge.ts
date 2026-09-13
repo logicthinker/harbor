@@ -24,6 +24,16 @@ const migrateProject = (input: Project): Project => {
 
 export const harbor = {
   async executeRequest(input: RequestInput): Promise<ResponseOutput> {
+    // SECURITY: Add defense-in-depth on the frontend to prevent SSRF or unsafe protocols
+    try {
+      const url = new URL(input.url)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return { status: 0, status_text: 'Security Error', headers: [], body: 'Only HTTP and HTTPS schemes are allowed', duration_ms: 0 }
+      }
+    } catch {
+      return { status: 0, status_text: 'Invalid URL', headers: [], body: 'The provided URL is invalid', duration_ms: 0 }
+    }
+
     const native = await invoke<ResponseOutput>('execute_request', { input })
     if (native) return native
     const started = performance.now()

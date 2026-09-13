@@ -1,0 +1,4 @@
+## 2024-03-20 - SSRF Prevention via Strict URL Scheme Validation
+**Vulnerability:** Server-Side Request Forgery (SSRF) and Local File Inclusion (LFI) risk via unrestricted URL schemes (e.g., `file://`) in the `execute_request` function.
+**Learning:** The application is a local-first API studio, meaning requests to `localhost` and private IPs are legitimate and required. However, there was no validation on the *scheme* of the URL, allowing the underlying HTTP client (`reqwest` in Rust, or `fetch` fallback in TypeScript) to attempt local file reads or other unintended protocols.
+**Prevention:** Explicitly parse and validate the URL scheme, enforcing an allowlist of strictly `http` and `https` protocols on both the frontend and backend to provide defense-in-depth without breaking the necessary local networking functionality.
