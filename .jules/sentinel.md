@@ -1,0 +1,4 @@
+## 2026-09-14 - Prevent SSRF via restricted URL schemes in execute_request
+**Vulnerability:** The `execute_request` backend command used the provided URL unconditionally when dispatching requests via `reqwest::Client`. While `reqwest` blocks `file://` scheme internally by default (returning a `BadScheme` error), relying solely on internal client defaults without active validation is unsafe, and can leave the app vulnerable to scheme smuggling or SSRF using other unexpected URI schemes in certain versions or configurations.
+**Learning:** Even though dependencies might implicitly block certain dangerous schemes, defense-in-depth requires explicit frontend input validation at the API boundary, especially when accepting fully-qualified URIs directly from the user.
+**Prevention:** Explicitly parse the URL (e.g. `reqwest::Url::parse`) and validate its `.scheme()` to strict allow-lists (such as `http` and `https`) before initializing outbound requests in Tauri commands.
