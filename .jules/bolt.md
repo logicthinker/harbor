@@ -1,0 +1,3 @@
+## 2024-09-14 - Optimize array filtering inside monolithic React component
+**Learning:** In large monolithic React applications without granular component splitting (like `src/main.tsx` in this codebase), expensive operations like array `.filter` are run on *every single keystroke* or state change, leading to major UI stuttering as the app scales. This is especially true for list processing inside the main render function.
+**Action:** Always wrap expensive list filtering logic in `useMemo` when working in monolithic React components, and hoist loop-invariant operations (like `.toLowerCase()`) outside the iterator loop.
