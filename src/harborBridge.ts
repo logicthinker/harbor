@@ -46,8 +46,16 @@ export const harbor = {
     await invoke('save_project', { project: diskProject })
   },
   exportProject(project: Project) {
-    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })
-    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${project.name.toLowerCase().replace(/\s+/g, '-')}.harbor.json`; link.click(); URL.revokeObjectURL(link.href)
+    const diskProject = JSON.parse(JSON.stringify(project)) as Project
+    for (const environment of diskProject.environments) {
+      for (const variable of environment.variables) {
+        if (variable.secret) {
+          variable.value = ''
+        }
+      }
+    }
+    const blob = new Blob([JSON.stringify(diskProject, null, 2)], { type: 'application/json' })
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${diskProject.name.toLowerCase().replace(/\s+/g, '-')}.harbor.json`; link.click(); URL.revokeObjectURL(link.href)
   },
   exportPostman(project: Project) {
     const collection = { info: { name: project.name, schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' }, variable: (project.environments[0]?.variables ?? []).map((variable) => ({ key: variable.key, value: variable.secret ? '' : variable.value, type: 'string' })), item: project.requests.map((request) => ({ name: request.name, request: { method: request.method, header: request.headers.filter((header) => header.enabled !== false).map((header) => ({ key: header.key, value: header.value })), body: request.body ? { mode: 'raw', raw: request.body } : undefined, url: { raw: request.url } }, event: request.tests.length ? [{ listen: 'test', script: { type: 'text/javascript', exec: request.tests.filter((test) => test.expression === 'status').map((test) => `pm.response.to.have.status(${test.expected});`) } }] : undefined })) }

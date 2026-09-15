@@ -1,0 +1,8 @@
+## 2025-05-24 - [Reqwest Security Theater Learning]
+**Vulnerability:** Initial suspicion of SSRF via `file://` scheme in `execute_request`.
+**Learning:** `reqwest` inherently blocks non-HTTP(S) schemes unless specifically configured to allow them. Adding an explicit scheme check for `http`/`https` before passing the URL to `reqwest` is unnecessary and constitutes "security theater". Additionally, modifying build artifacts or creating test files and leaving them in the repository pollutes the workspace.
+**Prevention:** Do not add explicit URL scheme validation when the underlying HTTP client (`reqwest`) already provides robust, secure defaults. Always ensure temporary scripts and build artifacts are cleaned up before finalizing code changes, and verify the actual behavior of dependencies before attempting to "fix" them.
+## 2025-05-24 - [Data Leakage via Project Export]
+**Vulnerability:** The `exportProject` feature exported the entire project as a JSON blob without clearing in-memory secret values, leading to exposure of sensitive API keys and tokens if the exported file was shared.
+**Learning:** Functions that serialize and output data to users (like downloads) must apply the same sanitization/redaction rules as functions that persist data to disk or databases.
+**Prevention:** Always deep-clone and scrub objects of `secret` values before passing them to `JSON.stringify` for external export, and write tests to ensure exported blobs do not contain known secret substrings. Ensure temporary scripts and build artifacts (like `icon.png`) are excluded from the git staging area before committing.
